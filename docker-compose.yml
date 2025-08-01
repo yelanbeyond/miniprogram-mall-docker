@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # Nginx Web服务器
+  nginx:
+    build: ./docker/nginx
+    container_name: miniprogram-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src/wwwroot/39.107.71.29:/var/www/html:ro
+      - ./uploads:/var/www/html/upload
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - php-fpm
+    networks:
+      - miniprogram-network
+
+  # PHP-FPM应用服务器
+  php-fpm:
+    build: ./docker/php
+    container_name: miniprogram-php
+    restart: unless-stopped
+    volumes:
+      - ./src/wwwroot/39.107.71.29:/var/www/html
+      - ./uploads:/var/www/html/upload
+      - ./logs/php:/var/log/php
+    environment:
+      - DB_HOST=mysql
+      - DB_NAME=123321qqqq
+      - DB_USER=123321qqqq
+      - DB_PASS=123321qqqq
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - miniprogram-network
+
+  # MySQL数据库
+  mysql:
+    image: mysql:5.7
+    container_name: miniprogram-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123321qqqq
+      MYSQL_DATABASE: 123321qqqq
+      MYSQL_USER: 123321qqqq
+      MYSQL_PASSWORD: 123321qqqq
+    volumes:
+      - ./database/data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./logs/mysql:/var/log/mysql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max_allowed_packet=128M
+      --innodb_buffer_pool_size=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - miniprogram-network
+
+  # Redis缓存
+  redis:
+    image: redis:6-alpine
+    container_name: miniprogram-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./database/redis:/data
+      - ./logs/redis:/var/log/redis
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    networks:
+      - miniprogram-network
+
+  # phpMyAdmin数据库管理
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: miniprogram-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: 123321qqqq
+      PMA_PASSWORD: 123321qqqq
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - miniprogram-network
+
+networks:
+  miniprogram-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
